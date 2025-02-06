@@ -7,10 +7,12 @@ const models = require('./models');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const port = 5001;
+const port = 8080;
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const bcrypt = require('bcrypt');
+const { where } = require("sequelize");
+const comments = require("./models/comments");
 const privateKey = crypto.randomBytes(32).toString('hex');
 
 
@@ -168,6 +170,82 @@ app.get('/users/find-id', async (req, res) => {
             message: "서버에 오류가 발생했습니다."
         });
     }
+});
+
+//댓글 생성
+app.post('/comments', (req, res) =>{
+    const { post_id, content } = req.body;
+
+    models.Comment.create({post_id, content})
+    .then((result)=>{
+        return res.status(201).json({message: '성공', comment: result});
+        // return res.send( {result,} ) //뒤에 내용이 들어올 수 있을때는 "," 비워둠
+    })
+    .catch((err)=>{
+        console.log(err);
+        return res.status(500).json({message: '서버 오류 발생'});
+    });
+});
+
+//댓글 전체 가져오기
+app.get('/comments', (req, res) =>{
+    models.Comment.findAll()
+    .then((result)=>{
+        console.log("Comments ===", result);
+        res.send({
+            comments: result
+        })
+    })
+    .catch((err)=>{
+        console.error(err);
+        res.send("에러 발생")
+    })
+});
+
+//댓글 수정
+app.put('/comments/:id', (req, res) => {
+    const { id } = req.params;
+    const { content } = req.body;
+
+    if(!content){
+        return res.status(400).send({success: false, message: "수정할 내용을 입력해주세요"});
+    }
+
+    models.Comment.update(
+        { content }, 
+        { where: { id } }
+    )
+    .then(([updated])=>{
+        if(updated){
+            res.status({success: true, message: "댓글이 수정되었습니다."})
+        } else{
+            res.status(404).send({success: false, message: "해당 댓글을 찾을 수 없습니다."})
+        }
+    })
+    .catch((err)=>{
+        console.error(err);
+        res.status(500).send({success: false, message: "댓글 수정 중 오류 발생"})
+    })
+});
+
+//댓글 삭제
+app.delete('/comments/:id', (req, res) => {
+    const {id} = req.params;
+
+    models.Comment.destroy({
+        where: {id},
+    })
+    .then((deleted) => {
+        if(deleted){
+            res.send({success: true, message: "댓글이 삭제되었습니다."})
+        }else{
+            res.send({success: true, message: "해당 댓글을 찾을 수 없습니다."})
+        }
+    })
+    .catch((err)=>{
+        console.error(err);
+        res.status(500).send({success: false, message: "댓글 삭제 중 오류가 발생했습니다."})
+    })
 });
 
 app.listen(port, () => {
