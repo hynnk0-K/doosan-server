@@ -19,7 +19,7 @@ const privateKey = crypto.randomBytes(32).toString('hex');
 
 app.use(express.json());
 app.use(cors({
-    origin: ['http://localhost:3000'],
+    origin: ['https://doosanbears-react.vercel.app','http://localhost:3000'],
     credentials: true
 }))
 
