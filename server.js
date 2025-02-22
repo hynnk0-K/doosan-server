@@ -128,6 +128,39 @@ app.post('/auth', (req, res) => {
     }
 });
 
+app.get("/auth/status", (req, res) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.json({ isAuthenticated: false });
+    }
+
+    const token = authHeader.split(" ")[1]; // Bearer 토큰 추출
+
+    try {
+        const decoded = jwt.verify(token, privateKey);
+        res.json({ isAuthenticated: true, user: decoded });
+    } catch (err) {
+        res.json({ isAuthenticated: false });
+    }
+});
+
+
+// app.get("/auth/status", (req, res) => {
+//     const token = req.headers.authorization?.split(" ")[1];
+
+//     if (!token) {
+//         return res.json({ isAuthenticated: false });
+//     }
+
+//     try {
+//         const decoded = jwt.verify(token, privateKey);
+//         res.json({ isAuthenticated: true, user: decoded });
+//     } catch (err) {
+//         res.json({ isAuthenticated: false });
+//     }
+// });
+
 
 app.get('/users/check-id', (req, res) => {
     const { user_id } = req.query;
