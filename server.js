@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 const models = require('./models');
+const router = express.Router();
 
 // Express의 내장 미들웨어로 본문 데이터 파싱
 app.use(express.json());
@@ -12,7 +13,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const bcrypt = require('bcrypt');
 const { where } = require("sequelize");
-const comments = require("./models/comments");
+const posts = require("./models/post");
 const privateKey = crypto.randomBytes(32).toString('hex');
 
 
@@ -29,6 +30,18 @@ models.sequelize.sync()
     .catch((err) => {
         console.error('Error syncing Sequelize:', err);
     });
+
+
+//로그인 검증
+router.get("/status", (req, res) => {
+    if(req.session.user){
+        req.json({isAuthenticated: true, user: req.session.user})
+    }else{
+        req.json({isAuthenticated: false})
+    }
+});
+
+module.exports = router;
 
 //회원가입
 app.post('/users', async (req, res) => {
@@ -171,6 +184,23 @@ app.get('/users/find-id', async (req, res) => {
         });
     }
 });
+
+//게시글 생성
+app.post('/posts', async (req, res) => {
+    const {post_id, title, user, date, contents, img} = req.body;
+
+    if(!user_id || !title || !contents){
+        return res.status(400).send({success:false, message: "필수 항목을 입력해주세요."});
+    }
+    try{
+        const newPost = await models.Post.create({title, user_id, date, contents, img});
+        res.status(201).send({success:true, post: newPost});
+    } catch(err) {
+        console.error(err);
+        res.status(500).send({success:false, message: "게시글 작성 실패"});
+    }
+});
+
 
 //댓글 생성
 app.post('/comments', (req, res) =>{
