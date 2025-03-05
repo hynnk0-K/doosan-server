@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   const Post = sequelize.define("Post", { 
-    post_id: {
+    id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
@@ -9,14 +9,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: false,
     },
-    user: {
-      type: DataTypes.STRING,
+    user_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
     },
     date: {
       type: DataTypes.DATEONLY,
-      allowNull: false,
-    },
+      allowNull: true,
+    },    
     contents: {
       type: DataTypes.TEXT,
       allowNull: false,
@@ -33,7 +33,7 @@ module.exports = (sequelize, DataTypes) => {
   );
 
   Post.associate = (models) => {
-    Post.belongsTo(models.User, { foreignKey: "user_id", targetKey: "id" });
+    Post.belongsTo(models.User, { foreignKey: "user_id", targetKey: "user_id" });
   };
 
   return Post;

@@ -2,27 +2,45 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 const models = require('./models');
-const router = express.Router();
+const multer= require("multer");
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+// Sequelize에서 직접 SQL 명령어를 실행하여 외래 키 제약을 비활성화
+const { sequelize } = require('./models');  // sequelize 인스턴스 가져오기
+
+const privateKey = crypto.randomBytes(32).toString('hex');
+const port = 8080;
 
 // Express의 내장 미들웨어로 본문 데이터 파싱
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const port = 8080;
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
-const bcrypt = require('bcrypt');
-const { where } = require("sequelize");
-const posts = require("./models/post");
-const privateKey = crypto.randomBytes(32).toString('hex');
-
-
-app.use(express.json());
+//CORS 설정
 app.use(cors({
     origin: ['https://doosanbears-react.vercel.app','http://localhost:3000'],
     credentials: true
-}))
+}));
 
+const router = express.Router();
+const bcrypt = require('bcrypt');
+const { where } = require("sequelize");
+const Post = require("./models/post");
+
+app.use("/uploads", express.static("uploads"));
+
+//Multer 설정
+const upload = multer({
+    storage: multer.diskStorage({
+       destination: function (req, file, cb) {
+          cb(null, "uploads");
+       },
+       filename: function (req, file, cb) {
+          cb(null, file.originalname);
+       },
+    }),
+  });
+
+  //DB연결
 models.sequelize.sync()
     .then(() => {
         console.log('Sequelize synced!');
@@ -32,7 +50,7 @@ models.sequelize.sync()
     });
 
 
-//로그인 검증
+//로그인 상태 확인
 router.get("/status", (req, res) => {
     if(req.session.user){
         req.json({isAuthenticated: true, user: req.session.user})
@@ -145,28 +163,11 @@ app.get("/auth/status", (req, res) => {
     }
 });
 
-
-// app.get("/auth/status", (req, res) => {
-//     const token = req.headers.authorization?.split(" ")[1];
-
-//     if (!token) {
-//         return res.json({ isAuthenticated: false });
-//     }
-
-//     try {
-//         const decoded = jwt.verify(token, privateKey);
-//         res.json({ isAuthenticated: true, user: decoded });
-//     } catch (err) {
-//         res.json({ isAuthenticated: false });
-//     }
-// });
-
-
 app.get('/users/check-id', (req, res) => {
     const { user_id } = req.query;
 
     if (!user_id) {
-        return res.status(400).send({ success: false, message: '아아디를 입력해주세요.' })
+        return res.status(400).send({ success: false, message: '아이디를 입력해주세요.' })
     }
     //데이터베이스에서 아이디 검색
     models.User.findOne({
@@ -190,7 +191,7 @@ app.get('/users/find-id', async (req, res) => {
     if(!name || !email ){
         return res.status(400).send({
             success: false,
-            message: "이름과 이메일을 확인주세요."
+            message: "이름과 이메일을 확인해주세요."
         });
     }
     try{
@@ -218,20 +219,64 @@ app.get('/users/find-id', async (req, res) => {
     }
 });
 
+
+app.get('/posts', (req, res)=>{
+    models.Post.findAll()
+    .then((result)=>{
+      console.log("Post :", result);
+      res.send({    
+        posts: result
+      })
+    })
+    .catch((error)=>{
+      console.error(error)
+      res.send("에러발생")
+    })
+  })
+
 //게시글 생성
 app.post('/posts', async (req, res) => {
-    const {post_id, title, user, date, contents, img} = req.body;
+    console.log("게시글 작성 요청:", req.body);
+    const {title, user_id, date = new Date(), contents, img} = req.body;
 
     if(!user_id || !title || !contents){
         return res.status(400).send({success:false, message: "필수 항목을 입력해주세요."});
     }
-    try{
-        const newPost = await models.Post.create({title, user_id, date, contents, img});
-        res.status(201).send({success:true, post: newPost});
-    } catch(err) {
-        console.error(err);
-        res.status(500).send({success:false, message: "게시글 작성 실패"});
+    try {
+        // 외래 키 제약 비활성화
+        await sequelize.query('PRAGMA foreign_keys = OFF;');
+
+        const newPost = await models.Post.create({ title, user_id, contents, img });
+        console.log('게시글 생성 결과:', newPost);
+        res.status(201).send({ success: true, post: newPost });
+    } catch (err) {
+        console.error("게시글 생성 오류:", err);
+        res.status(500).send({ success: false, message: "게시글 업로드에 실패했습니다." });
     }
+});
+
+app.get('/posts/:id', async (req, res)=>{
+    const {id} = req.params;
+    console.log("요청받은 게시글 ID:", id);
+    await models.Post.findOne({
+        where: { post_id: id, }
+    }).then((result)=>{
+        if(!result){
+            return res.status(404).send({ success: false, message: "게시글을 찾을 수 없습니다." });
+        }
+        console.log('Post:', result);
+        res.send({post:result});
+    }).catch((err)=>{
+        console.error(err)
+        res.status(500).send({ success: false, message: "게시글 조회 중 오류 발생" });
+    })
+});
+
+app.post('/image', upload.single('image'),(req, res)=>{
+    const file = req.file;
+    res.send({
+        imageUrl:file.path
+    })
 });
 
 
@@ -322,4 +367,4 @@ app.listen(port, () => {
             console.log('DB연결 에러')
             process.exit();
         })
-})
+});
